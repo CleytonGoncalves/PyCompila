@@ -1,24 +1,26 @@
 from enum import Enum
 
 
-# var, : , id, , , integer, real, ; , :=, if, then, +
 class TokenType(Enum):
-    ADD_OPERATOR = (r"\+", 1)
-    ASSIGNMENT = (r"(:=)", 1)
-    SEMI_COLON = (r";", 1)
-    COMMA = (r",", 1)
-    COLON = (r":", 2)
+    # A ordem da declaração define a prioridade de cada tipo
+    ADD_OPERATOR = r"\+"
+    ASSIGNMENT = r"(:=)"
+    SEMI_COLON = r";"
+    COMMA = r","
+    COLON = r":"
 
-    KEYWORD = (r"(var)|(integer)|(real)|(if)|(then)", 9)
-    IDENTIFIER = (r"[a-zA-Z][a-zA-Z0-9]*", 10)
+    KEYWORD = r"(var)|(integer)|(real)|(if)|(then)"
+    IDENTIFIER = r"[a-zA-Z][a-zA-Z0-9]*"
 
-    NEWLINE = (r"\n", 997)
-    WHITESPACE = (r"[ \t]+", 998)
-    MISMATCH = (r".", 999)  # Any leftover character
+    NEWLINE = r"\n"
+    WHITESPACE = r"[ \t]+"
+    MISMATCH = r"."  # Any leftover character
 
-    def __init__(self, regex: str, precedence: int) -> None:
+    def __init__(self, regex: str) -> None:
         self.regex = regex
-        self.precedence = precedence
+
+    def __str__(self):
+        return f"{self.name!r}: '{self.regex!r}'"
 
     def __ge__(self, other):
         if self.__class__ is other.__class__:
