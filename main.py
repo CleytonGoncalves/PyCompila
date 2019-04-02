@@ -1,4 +1,4 @@
-from Lexer.lexer import tokenize
+from lexer.tokenizer import tokenize
 
 code = """
 var

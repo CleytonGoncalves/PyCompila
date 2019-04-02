@@ -1,7 +1,7 @@
 import re
 
-from Lexer.token import Token
-from Lexer.tokentype import TokenType
+from lexer.token import Token
+from lexer.tokentype import TokenType
 
 
 def tokenize(code):
