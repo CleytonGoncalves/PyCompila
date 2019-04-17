@@ -1,10 +1,11 @@
 from lexer import tokenize
-from syntactic_parser import parse
+from sy_parser import parse
 
 code1 = """
-var a := b;
-if a+b)
-then a:=c
+var
+    a, b, c: integer;
+    d:real
+if a+b then a:=c
 """
 
 print("Lexical Analysis:")
