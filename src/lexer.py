@@ -75,6 +75,8 @@ def tokenize(code: str) -> Sequence[Token]:
             continue
         elif token_type == TokenType.WHITESPACE:
             continue
+        elif should_end:
+            raise Exception(f"Unexpected {value!r} after program end")
         elif token_type == TokenType.MISMATCH:
             raise Exception(f"Character {value!r} unexpected on line {line_num}:\n>\t{code.splitlines()[line_num - 1]}")
 
