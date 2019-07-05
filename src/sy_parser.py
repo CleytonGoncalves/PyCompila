@@ -40,6 +40,17 @@ class Parser:
     def add_to_var_list(self, name: str) -> None:
         self.variable_list.append(name)
 
+    def assert_vars_type_compatible(self) -> None:
+        if len(self.variable_list) <= 1:
+            return
+
+        correct_type = self.symbol_table.lookup(self.variable_list[0])
+        isCompatible = all(self.symbol_table.lookup(var) == correct_type for var in self.variable_list)
+        if not isCompatible:
+            self.raise_semantic_error(f"Incompatible variable types: {self.variable_list!r}")
+
+        self.variable_list.clear()
+
     def add_vars_to_symbol_table(self, var_type: TokenType) -> None:
         for var in self.variable_list:
             if self.symbol_table.lookup(var) is not None:
@@ -174,6 +185,8 @@ class Parser:
             if self.symbol_table.lookup(self.get_prev_token().value) is None:
                 self.raise_semantic_error(f"Undeclared variable: {self.get_prev_token().value!r}")
 
+            self.add_to_var_list(self.get_prev_token().value)
+
             if self.is_type(TokenType.ASSIGNMENT, error_on_fail=True):
                 self.e()
         elif self.is_type(TokenType.KEYWORD_IF):
@@ -189,6 +202,8 @@ class Parser:
         """
         self.t()
         self.r()
+
+        self.assert_vars_type_compatible()
 
     def r(self) -> None:
         """
@@ -206,6 +221,8 @@ class Parser:
 
         if self.symbol_table.lookup(self.get_prev_token().value) is None:
             self.raise_semantic_error(f"Undeclared variable: {self.get_prev_token().value!r}")
+
+        self.add_to_var_list(self.get_prev_token().value)
 
 
 def parse(tokens: Sequence[Token], code: str = None):
