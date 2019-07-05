@@ -1,21 +1,47 @@
 import re
 from enum import Enum
-from typing import Sequence
+from typing import Sequence, List
 
 
 class TokenType(Enum):
-    # A ordem da declaração define a prioridade de cada tipo
-    ADD_OPERATOR = r"\+"
-    ASSIGNMENT = r"(:=)"
-    SEMI_COLON = r";"
-    COMMA = r","
-    COLON = r":"
+    COMMENT = r"(\/\*(.*?)\*\/)|(\{(.*?)\})"
+
+    LITERAL_FLOAT = r"([0-9]+\.[0-9]+)"
+    LITERAL_INTEGER = r"([0-9]+)"
 
     KEYWORD_VAR = r"(var)"
     KEYWORD_INTEGER = r"(integer)"
     KEYWORD_REAL = r"(real)"
     KEYWORD_IF = r"(if)"
     KEYWORD_THEN = r"(then)"
+    KEYWORD_ELSE = r"(else)"
+    KEYWORD_BEGIN = r"(begin)"
+    KEYWORD_END = r"(end)"
+    KEYWORD_WHILE = r"(while)"
+    KEYWORD_DO = r"(do)"
+    KEYWORD_WRITE = r"(write)"
+    KEYWORD_READ = r"(read)"
+    KEYWORD_PROGRAM = r"(program)"
+    KEYWORD_PROCEDURE = r"(procedure)"
+
+    SYMBOL_DIFFERENT = r"(<>)"
+    SYMBOL_GREATER_EQUAL = r"(>=)"
+    SYMBOL_LESS_EQUAL = r"(<=)"
+    SYMBOL_ASSIGNMENT = r"(:=)"
+    SYMBOL_DOLLAR = r"\$"
+    SYMBOL_OPEN_PARENS = r"\("
+    SYMBOL_CLOSE_PARENS = r"\)"
+    SYMBOL_MULTIPLICATION = r"\*"
+    SYMBOL_DIVISION = r"\/"
+    SYMBOL_ADD = r"\+"
+    SYMBOL_SUBTRACT = r"\-"
+    SYMBOL_GREATER = r"\>"
+    SYMBOL_LESS = r"\<"
+    SYMBOL_COLON = r"\:"
+    SYMBOL_SEMICOLON = r"\;"
+    SYMBOL_EQUALS = r"\="
+    SYMBOL_COMMA = r"\,"
+    SYMBOL_FULL_STOP = r"\."
 
     IDENTIFIER = r"[a-zA-Z][a-zA-Z0-9]*"
 
@@ -62,14 +88,18 @@ def tokenize(code: str) -> Sequence[Token]:
     tokens_regex: str = '|'.join(f'(?P<{token_type.name}>{token_type.regex})' for token_type in TokenType)
     line_num: int = 1
     line_start: int = 0
+    should_end = False
 
     tokens = []
-    for match in re.finditer(tokens_regex, code):
+    for match in re.finditer(tokens_regex, code, re.DOTALL):
         token_type = TokenType[f'{match.lastgroup}']
         value = match.group()
         column_num = match.start() - line_start
 
-        if token_type == TokenType.NEWLINE:
+        if token_type == TokenType.COMMENT:
+            line_num += value.count("\n")  # Conta quebras de linha dos comentários
+            continue
+        elif token_type == TokenType.NEWLINE:
             line_start = match.end()
             line_num += 1
             continue
@@ -82,4 +112,11 @@ def tokenize(code: str) -> Sequence[Token]:
 
         tokens.append(Token(token_type, value, line_num, column_num))
 
+        should_end = is_end_of_program(tokens)
+
     return tokens
+
+
+def is_end_of_program(tokens: List[Token]):
+    return len(tokens) >= 2 and tokens[-2].token_type == TokenType.KEYWORD_END \
+           and tokens[-1].token_type == TokenType.SYMBOL_FULL_STOP
