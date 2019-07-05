@@ -1,0 +1,16 @@
+program teste
+    var a, b: real;
+    var e: integer;
+    procedure fn(x: integer)
+    var c: real;
+    var a: integer
+    begin
+    	write(x)
+    end
+begin
+    read(a); read(b);
+    while a <> b do { Assegura que os dois valores são iguais }
+        read(a); read(b); fn(b)
+    $;
+    fn(a)
+end.

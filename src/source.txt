@@ -1,4 +1,26 @@
-var
-    a, b, c: integer;
-    d:real
-if a+b then a:=c
+{program nome2
+/* exe*mplo2 */
+var a, x:real ;
+var ab:real;
+var ac:real;
+var abx: integer;
+var b:integer;
+procedure nomep(x:integer)
+begin
+read(c,a);
+if a < x + c then
+a:= c+x;
+write(a)
+else c:=a+x$
+end
+begin{programa principal
+read(b);
+nomep(b)
+end.}
+
+program teste
+    /* programa teste */
+    var a,b,c:integer;
+    var e:real  
+    begin read(a); {ler}
+    c:=d+3.5 end. 
