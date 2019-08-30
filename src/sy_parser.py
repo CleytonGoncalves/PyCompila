@@ -1,6 +1,8 @@
 from typing import Sequence, Optional, Dict, List
 
 from lexer import Token, TokenType
+from parser_exception import ParserException
+from semantic_exception import SemanticException
 
 
 class SymbolTable:
@@ -45,8 +47,8 @@ class Parser:
             return
 
         correct_type = self.symbol_table.lookup(self.variable_list[0])
-        isCompatible = all(self.symbol_table.lookup(var) == correct_type for var in self.variable_list)
-        if not isCompatible:
+        is_compatible = all(self.symbol_table.lookup(var) == correct_type for var in self.variable_list)
+        if not is_compatible:
             self.raise_semantic_error(f"Incompatible variable types: {self.variable_list!r}")
 
         self.variable_list.clear()
@@ -61,7 +63,7 @@ class Parser:
         self.variable_list.clear()
 
     def parse(self) -> bool:
-        self.z()
+        self.programa()
         return self.valid
 
     def next_token(self) -> None:
@@ -81,7 +83,7 @@ class Parser:
         self.valid = False
         expected_str = ' | '.join(str(exp_type) for exp_type in expected_types)
 
-        raise Exception(self.format_error(expected_str))
+        raise ParserException(self.format_error(expected_str))
 
     def format_error(self, expected_str: str):
         error_msg = \
@@ -115,114 +117,324 @@ class Parser:
         return False
 
     def raise_semantic_error(self, msg):
-        raise Exception(msg)
+        raise SemanticException(msg)
 
     ###################
     # Syntactic Rules #
     ###################
 
-    def z(self) -> None:
+    def programa(self) -> None:
         """
-        Z ::= I S
+        <programa> ::= program ident <corpo> .
         """
-        self.i()
-        self.s()
+        self.is_type(TokenType.KEYWORD_PROGRAM, error_on_fail=True)
+        self.is_type(TokenType.IDENTIFIER, error_on_fail=True)
+        self.corpo()
+        self.is_type(TokenType.SYMBOL_FULL_STOP, error_on_fail=True)
 
-    def i(self) -> None:
+    def corpo(self) -> None:
         """
-        I ::= 'var' D
+        <corpo> ::= <dc> begin <comandos> end
         """
-        if self.is_type(TokenType.KEYWORD_VAR, error_on_fail=True):
-            self.d()
+        self.dc()
+        self.is_type(TokenType.KEYWORD_BEGIN, error_on_fail=True)
+        self.comandos()
+        self.is_type(TokenType.KEYWORD_END, error_on_fail=True)
 
-    def d(self) -> None:
+    def dc(self) -> None:
         """
-        D ::= L ':' K O
+        <dc> ::= <dc_v> <mais_dc> | <dc_p> <mais_dc> | λ
         """
-        self.l()
-        if self.is_type(TokenType.COLON, error_on_fail=True):
-            self.k()
-            self.o()
+        try:
+            self.dc_v()
+            self.mais_dc()
+        except ParserException:
+            try:
+                self.dc_p()
+                self.mais_dc()
+            except ParserException:
+                pass
 
-    def l(self) -> None:
+    def mais_dc(self) -> None:
         """
-        L ::= 'id' X
+        <mais_dc> ::= ; <dc> | λ
         """
-        if self.is_type(TokenType.IDENTIFIER, error_on_fail=True):
-            self.add_to_var_list(self.get_prev_token().value)
-            self.x()
+        if self.is_type(TokenType.SYMBOL_SEMICOLON):
+            self.dc()
 
-    def x(self) -> None:
+    def dc_v(self) -> None:
         """
-        X ::= (',' L)?
+        <dc_v> ::= var <variaveis> : <tipo_var>
         """
-        if self.is_type(TokenType.COMMA):
-            self.l()
+        self.is_type(TokenType.KEYWORD_VAR, error_on_fail=True)
+        self.variaveis()
+        self.is_type(TokenType.SYMBOL_COLON, error_on_fail=True)
+        self.tipo_var()
 
-    def k(self) -> None:
+    def tipo_var(self) -> None:
         """
-        K ::= 'integer'  |  'real'
+        <tipo_var> ::= real | integer
+        Ação semântica: Adicionar tipo na tabela de símbolo.
         """
         if self.is_type(TokenType.KEYWORD_INTEGER):
-            self.add_vars_to_symbol_table(TokenType.KEYWORD_INTEGER)
+            pass
         elif self.is_type(TokenType.KEYWORD_REAL):
-            self.add_vars_to_symbol_table(TokenType.KEYWORD_REAL)
+            pass
         else:
             self.raise_parser_error(TokenType.KEYWORD_INTEGER, TokenType.KEYWORD_REAL)
 
-    def o(self) -> None:
+    def variaveis(self) -> None:
         """
-        O ::= (';' D)?
-        """
-        if self.is_type(TokenType.SEMI_COLON):
-            self.d()
-
-    def s(self) -> None:
-        """
-        S ::= 'id' ':=' E | 'if' E 'then' S
-        """
-        if self.is_type(TokenType.IDENTIFIER):
-            if self.symbol_table.lookup(self.get_prev_token().value) is None:
-                self.raise_semantic_error(f"Undeclared variable: {self.get_prev_token().value!r}")
-
-            self.add_to_var_list(self.get_prev_token().value)
-
-            if self.is_type(TokenType.ASSIGNMENT, error_on_fail=True):
-                self.e()
-        elif self.is_type(TokenType.KEYWORD_IF):
-            self.e()
-            if self.is_type(TokenType.KEYWORD_THEN, error_on_fail=True):
-                self.s()
-        else:
-            self.raise_parser_error(TokenType.IDENTIFIER, TokenType.KEYWORD_IF)
-
-    def e(self) -> None:
-        """
-        E ::= T R
-        """
-        self.t()
-        self.r()
-
-        self.assert_vars_type_compatible()
-
-    def r(self) -> None:
-        """
-        R ::= ('+' T R)?
-        """
-        if self.is_type(TokenType.ADD_OPERATOR):
-            self.t()
-            self.r()
-
-    def t(self) -> None:
-        """
-        T ::= 'id'
+        variaveis> ::= ident <mais_var>
+        Ação semântica: Adicionar identificadores na tabela de símbolo.
         """
         self.is_type(TokenType.IDENTIFIER, error_on_fail=True)
+        self.mais_var()
 
-        if self.symbol_table.lookup(self.get_prev_token().value) is None:
-            self.raise_semantic_error(f"Undeclared variable: {self.get_prev_token().value!r}")
+    def mais_var(self) -> None:
+        """
+        <mais_var> ::= , <variaveis> | λ
+        """
+        if self.is_type(TokenType.SYMBOL_COMMA):
+            self.variaveis()
 
-        self.add_to_var_list(self.get_prev_token().value)
+    def dc_p(self) -> None:
+        """
+        <dc_p> ::= procedure ident <parametros> <corpo_p>
+        Ação semântica: Adiciona procedimentos na tabela de símbolos.
+        """
+        self.is_type(TokenType.KEYWORD_PROCEDURE, error_on_fail=True)
+        self.is_type(TokenType.IDENTIFIER, error_on_fail=True)
+        self.parametros()
+        self.corpo_p()
+
+    def parametros(self) -> None:
+        """
+        <parametros> ::= ( <lista_par> ) | λ
+        """
+        if self.is_type(TokenType.SYMBOL_OPEN_PARENS):
+            self.lista_par()
+            self.is_type(TokenType.SYMBOL_CLOSE_PARENS, error_on_fail=True)
+
+    def lista_par(self) -> None:
+        """
+        <lista_par> ::= <variaveis> : <tipo_var> <mais_par>
+        """
+        self.variaveis()
+        self.is_type(TokenType.SYMBOL_COLON, error_on_fail=True)
+        self.tipo_var()
+        self.mais_par()
+
+    def mais_par(self) -> None:
+        """
+        <mais_par> ::= ; <lista_par> | λ
+        """
+        if self.is_type(TokenType.SYMBOL_SEMICOLON):
+            self.lista_par()
+
+    def corpo_p(self) -> None:
+        """
+        <corpo_p> ::= <dc_loc> begin <comandos> end
+        """
+        self.dc_loc()
+        self.is_type(TokenType.KEYWORD_BEGIN, error_on_fail=True)
+        self.comandos()
+        self.is_type(TokenType.KEYWORD_END, error_on_fail=True)
+
+    def dc_loc(self) -> None:
+        """
+        <dc_loc> ::= <dc_v> <mais_dcloc> | λ
+        """
+        try:
+            self.dc_v()
+            self.mais_dcloc()
+        except ParserException:
+            pass
+
+    def mais_dcloc(self) -> None:
+        """
+        <mais_dcloc> ::= ; <dc_loc> | λ
+        """
+        if self.is_type(TokenType.SYMBOL_SEMICOLON):
+            self.dc_loc()
+
+    def lista_arg(self) -> None:
+        """
+        <lista_arg> ::= ( <argumentos> ) | λ
+        """
+        if self.is_type(TokenType.SYMBOL_OPEN_PARENS):
+            self.argumentos()
+            self.is_type(TokenType.SYMBOL_CLOSE_PARENS, error_on_fail=True)
+
+    def argumentos(self) -> None:
+        """
+        <argumentos> ::= ident <mais_ident>
+        """
+        self.is_type(TokenType.IDENTIFIER, error_on_fail=True)
+        self.mais_ident()
+
+    def mais_ident(self) -> None:
+        """
+        <mais_ident> ::= ; <argumentos> | λ
+        """
+        if self.is_type(TokenType.SYMBOL_SEMICOLON):
+            self.argumentos()
+
+    def p_falsa(self) -> None:
+        """
+        <pfalsa> ::= else <comandos> | λ
+        """
+        if self.is_type(TokenType.KEYWORD_ELSE):
+            self.comandos()
+
+    def comandos(self) -> None:
+        """
+        <comandos> ::= <comando> <mais_comandos>
+        """
+        self.comando()
+        self.mais_comandos()
+
+    def mais_comandos(self) -> None:
+        """
+        <mais_comandos> ::= ; <comandos> | λ
+        """
+        if self.is_type(TokenType.SYMBOL_SEMICOLON):
+            self.comandos()
+
+    def comando(self) -> None:
+        """
+        <comando> ::= read(<variaveis>)
+            | write(<variaveis>)
+            | while <condicao> do <comandos> $
+            | if <condicao> then <comandos> <pfalsa> $
+            | ident <restoIdent>
+        """
+        if self.is_type(TokenType.KEYWORD_READ):
+            self.is_type(TokenType.SYMBOL_OPEN_PARENS, error_on_fail=True)
+            self.variaveis()
+            self.is_type(TokenType.SYMBOL_CLOSE_PARENS, error_on_fail=True)
+        elif self.is_type(TokenType.KEYWORD_WRITE):
+            self.is_type(TokenType.SYMBOL_OPEN_PARENS, error_on_fail=True)
+            self.variaveis()
+            self.is_type(TokenType.SYMBOL_CLOSE_PARENS, error_on_fail=True)
+        elif self.is_type(TokenType.KEYWORD_WHILE):
+            self.condicao()
+            self.is_type(TokenType.KEYWORD_DO, error_on_fail=True)
+            self.comandos()
+            self.is_type(TokenType.SYMBOL_DOLLAR, error_on_fail=True)
+        elif self.is_type(TokenType.KEYWORD_IF):
+            self.condicao()
+            self.is_type(TokenType.KEYWORD_THEN, error_on_fail=True)
+            self.comandos()
+            self.p_falsa()
+            self.is_type(TokenType.SYMBOL_DOLLAR, error_on_fail=True)
+        elif self.is_type(TokenType.IDENTIFIER, error_on_fail=True):
+            self.resto_ident()
+
+    def resto_ident(self) -> None:
+        """
+        <restoIdent> ::= := <expressao> | <lista_arg>
+        Ação semântica: Verificar os tipos das variaveis em atribuições.
+        """
+        if self.is_type(TokenType.SYMBOL_ASSIGNMENT):
+            self.expressao()
+        else:
+            self.lista_arg()
+
+    def condicao(self) -> None:
+        """
+        <condicao> ::= <expressao> <relacao> <expressao>
+        """
+        self.expressao()
+        self.relacao()
+        self.expressao()
+
+    def relacao(self) -> None:
+        """
+        <relacao>::= = | <> | >= | <= | > | <
+        """
+        if self.is_type(TokenType.SYMBOL_EQUALS) or \
+                self.is_type(TokenType.SYMBOL_DIFFERENT) or \
+                self.is_type(TokenType.SYMBOL_GREATER_EQUAL) or \
+                self.is_type(TokenType.SYMBOL_LESS_EQUAL) or \
+                self.is_type(TokenType.SYMBOL_GREATER) or \
+                self.is_type(TokenType.SYMBOL_LESS, error_on_fail=True):
+            pass
+
+    def expressao(self) -> None:
+        """
+        <expressao> ::= <termo> <outros_termos>
+        """
+        self.termo()
+        self.outros_termos()
+
+    # \\\\\\\\\ Checar essa regra aqui ///////////
+    def op_un(self) -> None:
+        """
+        <op_un> ::= + | - | λ
+        """
+        if self.is_type(TokenType.SYMBOL_ADD) or \
+                self.is_type(TokenType.SYMBOL_SUBTRACT):
+            pass
+
+    def outros_termos(self) -> None:
+        """
+        <outros_termos> ::= <op_ad> <termo> <outros_termos> | λ
+        """
+        try:
+            self.op_ad()
+            self.termo()
+            self.outros_termos()
+        except ParserException:
+            pass
+
+    def op_ad(self) -> None:
+        """
+        <op_ad> ::= + | -
+        """
+        if self.is_type(TokenType.SYMBOL_ADD) or \
+                self.is_type(TokenType.SYMBOL_SUBTRACT, error_on_fail=True):
+            pass
+
+    def termo(self) -> None:
+        """
+        <termo> ::= <op_un> <fator> <mais_fatores>
+        """
+        self.op_un()
+        self.fator()
+        self.mais_fatores()
+
+    def mais_fatores(self) -> None:
+        """
+        <mais_fatores>::= <op_mul> <fator> <mais_fatores> | λ
+        """
+        try:
+            self.op_mul()
+            self.fator()
+            self.mais_fatores()
+        except ParserException:
+            pass
+
+    def op_mul(self) -> None:
+        """
+        <op_mul> ::= * | /
+        """
+        if self.is_type(TokenType.SYMBOL_MULTIPLICATION) or \
+                self.is_type(TokenType.SYMBOL_DIVISION, error_on_fail=True):
+            pass
+
+    def fator(self) -> None:
+        """
+        <fator> ::= ident | numero_int | numero_real | (<expressao>)
+        """
+        if self.is_type(TokenType.IDENTIFIER) or \
+                self.is_type(TokenType.LITERAL_INTEGER) or \
+                self.is_type(TokenType.LITERAL_FLOAT):
+            pass
+        else:
+            self.is_type(TokenType.SYMBOL_OPEN_PARENS, error_on_fail=True)
+            self.expressao()
+            self.is_type(TokenType.SYMBOL_CLOSE_PARENS, error_on_fail=True)
 
 
 def parse(tokens: Sequence[Token], code: str = None):

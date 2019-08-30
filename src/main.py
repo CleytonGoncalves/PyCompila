@@ -1,7 +1,7 @@
 from lexer import tokenize
 from sy_parser import parse
 
-filename = "source.txt"
+filename = "source-compl.txt"
 
 with open(filename) as f:
     source_code = f.read().rstrip()
